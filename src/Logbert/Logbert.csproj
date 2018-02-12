@@ -75,6 +75,10 @@
     <StartupObject>Logbert.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="CommandLine, Version=2.2.1.0, Culture=neutral, PublicKeyToken=de6f01bd326f8c32, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>Libraries\CommandLine.dll</HintPath>
+    </Reference>
     <Reference Include="MoonSharp.Interpreter, Version=1.5.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>Libraries\MoonSharp.Interpreter.dll</HintPath>
@@ -269,6 +273,7 @@
       <DependentUpon>FrmOptions.cs</DependentUpon>
     </Compile>
     <Compile Include="Helper\Browser.cs" />
+    <Compile Include="Helper\CommandLineOptions.cs" />
     <Compile Include="Helper\GdiCache.cs" />
     <Compile Include="Helper\Extensions.cs" />
     <Compile Include="Helper\FlatColorTable.cs" />
@@ -616,6 +621,7 @@
     <None Include="Resources\properties_16xLG.png" />
     <None Include="Resources\StatusAnnotations_Information_16xLG.png" />
     <None Include="Resources\Logbert Start Screen.png" />
+    <Content Include="Libraries\CommandLine.dll" />
     <Content Include="Libraries\MoonSharp.Interpreter.dll" />
     <Content Include="Libraries\ScintillaNET.dll" />
     <Content Include="Libraries\WeifenLuo.WinFormsUI.Docking.dll" />

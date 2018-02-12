@@ -30,109 +30,116 @@
 
 using System;
 using System.IO.Pipes;
+using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
 using Com.Couchcoding.Logbert.Helper;
 using Com.Couchcoding.Logbert.Properties;
+using CommandLine;
 
 namespace Logbert
 {
-  /// <summary>
-  /// Implements the main entry point of the application.
-  /// </summary>
-  internal static class Program
-  {
-    #region Private Consts
-
     /// <summary>
-    /// Defines the system global name for the named piped, used for inter process communication.
+    /// Implements the main entry point of the application.
     /// </summary>
-    private const string NAMED_PIPED_NAME = "{4A966FCD-17C6-41F9-B9BD-6E491FDCC74C}";
-
-    /// <summary>
-    /// Defines the global message to bring the logbert main UI to front.
-    /// </summary>
-    public const string BRING_TO_FRONT_MSG = "LB_BRING_TO_FRONT";
-
-    #endregion
-
-    #region Public Methods
-
-    /// <summary>
-    /// The main entry point for the application.
-    /// </summary>
-    [STAThread]
-    private static void Main(string[] args)
+    internal static class Program
     {
-      try
-      {
-        // Upgrade the user settings if necessary.
-        if (Settings.Default.SettingsUpgradeRequired)
+        #region Private Consts
+
+        /// <summary>
+        /// Defines the system global name for the named piped, used for inter process communication.
+        /// </summary>
+        private const string NAMED_PIPED_NAME = "{4A966FCD-17C6-41F9-B9BD-6E491FDCC74C}";
+
+        /// <summary>
+        /// Defines the global message to bring the logbert main UI to front.
+        /// </summary>
+        public const string BRING_TO_FRONT_MSG = "LB_BRING_TO_FRONT";
+
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>
+        /// The main entry point for the application.
+        /// </summary>
+        [STAThread]
+        private static void Main( string[] args )
         {
-          Settings.Default.Upgrade();
-          Settings.Default.SettingsUpgradeRequired = false;
-          Settings.Default.SaveSettings();
+            try {
+                // Upgrade the user settings if necessary.
+                if( Settings.Default.SettingsUpgradeRequired ) {
+                    Settings.Default.Upgrade();
+                    Settings.Default.SettingsUpgradeRequired = false;
+                    Settings.Default.SaveSettings();
+                }
+            }
+            catch( Exception ex ) {
+                Logger.Error(
+                    "Error while upgrading the user settings: {0}"
+                  , ex );
+            }
+
+
+            // Commandline parameters
+            CommandLineOptions cmdOptions = null;
+            Parser.Default.ParseArguments<CommandLineOptions>( args )
+                .WithParsed( o => cmdOptions = o )
+                .WithNotParsed( errs => {
+                    Logger.Error( "Commandline errors." );
+                    foreach( var e in errs ) {
+                        Logger.Error( e.ToString() );
+                    }
+                } );
+
+
+            if( Settings.Default.FrmMainAllowOnlyOneInstance && !MainForm.CreateNamedPipe( NAMED_PIPED_NAME ) ) {
+                Logger.Info( "Another instance of Logbert is already running." );
+
+                // Bring the window of the other instance to front.
+                NamedPipeClientStream anotherLogbertInstance = new NamedPipeClientStream(
+                    "."
+                  , NAMED_PIPED_NAME
+                  , PipeDirection.Out );
+
+                try {
+                    if( !anotherLogbertInstance.ConnectAndWrite( Encoding.Default.GetBytes( BRING_TO_FRONT_MSG ) ) ) {
+                        Logger.Error( "Unable to passing arguments to it." );
+                        return;
+                    }
+
+                    Logger.Info( "Passing arguments to it and exiting." );
+
+                    if( cmdOptions != null && cmdOptions.Files.Count() > 0 ) {
+                        // Send the command line arguments to the other instance and exit.
+                        anotherLogbertInstance = new NamedPipeClientStream(
+                            "."
+                          , NAMED_PIPED_NAME
+                          , PipeDirection.Out );
+
+                        anotherLogbertInstance.ConnectAndWrite(
+                          Encoding.Default.GetBytes( cmdOptions.Files.First() ) );
+
+                        return;
+                    }
+                }
+                catch( Exception ex ) {
+                    Logger.Error( ex.Message );
+                    return;
+                }
+
+                return;
+            }
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault( false );
+
+            Application.Run( new MainForm( cmdOptions == null || cmdOptions.Files.Count() == 0
+              ? string.Empty
+              : cmdOptions.Files.First() ) );
         }
-      }
-      catch (Exception ex)
-      {
-        Logger.Error(
-            "Error while upgrading the user settings: {0}"
-          , ex);
-      }
 
-      if (Settings.Default.FrmMainAllowOnlyOneInstance && !MainForm.CreateNamedPipe(NAMED_PIPED_NAME))
-      {
-        Logger.Info("Another instance of Logbert is already running.");
-
-        // Bring the window of the other instance to front.
-        NamedPipeClientStream anotherLogbertInstance = new NamedPipeClientStream(
-            "."
-          , NAMED_PIPED_NAME
-          , PipeDirection.Out);
-
-        try
-        {
-          if (!anotherLogbertInstance.ConnectAndWrite(Encoding.Default.GetBytes(BRING_TO_FRONT_MSG)))
-          {
-            Logger.Error("Unable to passing arguments to it.");
-            return;
-          }
-
-          Logger.Info("Passing arguments to it and exiting.");
-
-          if (args.Length > 0)
-          {
-            // Send the command line arguments to the other instance and exit.
-            anotherLogbertInstance = new NamedPipeClientStream(
-                "."
-              , NAMED_PIPED_NAME
-              , PipeDirection.Out);
-
-            anotherLogbertInstance.ConnectAndWrite(
-              Encoding.Default.GetBytes(args[0]));
-
-            return;
-          }
-        }
-        catch (Exception ex)
-        {
-          Logger.Error(ex.Message);
-          return;
-        }
-
-        return;
-      }
-
-      Application.EnableVisualStyles();
-      Application.SetCompatibleTextRenderingDefault(false);
-
-      Application.Run(new MainForm(args.Length == 0
-        ? string.Empty
-        : args[0]));
+        #endregion
     }
-
-    #endregion
-  }
 }
